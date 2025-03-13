@@ -1,28 +1,34 @@
-# Sử dụng PHP với Apache
-FROM php:8.1-apache
+FROM php:8.1-fpm
 
-# Cài extension cần thiết
-RUN docker-php-ext-install pdo pdo_mysql
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    git \
+    curl
 
-# Enable mod_rewrite
-RUN a2enmod rewrite
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 
-# Copy project vào container
-COPY . /var/www/html
-
-# Set quyền cho thư mục storage và bootstrap
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-
-# Copy file vhost config nếu cần (nếu dùng Laravel public folder)
-# COPY ./vhost.conf /etc/apache2/sites-available/000-default.conf
-
-# Cài composer
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www/html
+# Set working directory
+WORKDIR /var/www
 
-# Cài thư viện Laravel
+# Copy existing application directory contents
+COPY . /var/www
+
+# Install dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Expose port 80
-EXPOSE 80
+# Set permissions
+RUN chown -R www-data:www-data /var/www/storage
+
+# Expose port 9000 and start php-fpm server
+EXPOSE 9000
+CMD ["php-fpm"]
