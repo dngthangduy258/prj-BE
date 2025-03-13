@@ -1,31 +1,33 @@
 FROM php:8.2-fpm
 
-# Install system dependencies
+WORKDIR /var/www
+
 RUN apt-get update && apt-get install -y \
     git \
     curl \
+    zip \
+    unzip \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
-    zip \
-    unzip \
-    libzip-dev
+    libzip-dev \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY composer.json composer.lock ./
 
-WORKDIR /var/www
+# ⚠️ Không chạy scripts khi chưa đủ source code
+RUN composer install --optimize-autoloader --no-dev --no-scripts
 
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader
+# ✅ Giờ chạy script sau khi đã có đủ source code
+RUN composer run-script post-autoload-dump || true
+RUN php artisan config:clear
 
-# Permissions
-RUN chown -R www-data:www-data /var/www \
-    && chmod -R 755 /var/www/storage
+RUN chmod -R 775 storage bootstrap/cache
 
-EXPOSE 9000
-CMD ["php-fpm"]
+EXPOSE 8000
+
+CMD php artisan serve --host=0.0.0.0 --port=8000

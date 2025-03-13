@@ -1,0 +1,24 @@
+# Ignore Composer dependencies
+/vendor
+
+# Ignore Node dependencies
+/node_modules
+
+# Ignore environment files (optional)
+/.env
+
+# Ignore Git files
+.git
+.gitignore
+.gitattributes
+
+# Ignore IDE/editor config
+*.log
+.idea
+*.sublime-project
+*.sublime-workspace
+*.vscode
+
+# Optional - ignore only files inside storage, not the folders
+/storage/logs/*
+/storage/framework/cache/*
