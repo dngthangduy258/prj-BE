@@ -5,6 +5,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\GoogleAuthController;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 /*
 |--------------------------------------------------------------------------
 | Public Routes
@@ -53,6 +55,31 @@ Route::get('/api/auth/google/callback', [GoogleAuthController::class, 'callback'
 
 
 Route::get('/run-migrate', function () {
+
+    // Kiểm tra database có tồn tại chưa (optional)
+    $dbName = env('DB_DATABASE');
+    try {
+        DB::connection()->getPdo();
+        $database = DB::connection()->getDatabaseName();
+        if ($database === $dbName) {
+            echo " Đang kết nối tới database `{$database}`.<br>";
+        }
+    } catch (\Exception $e) {
+        return ' Không kết nối được database: ' . $e->getMessage();
+    }
+
+    // Chạy migrate
     Artisan::call('migrate', ['--force' => true]);
-    return 'Migrated!';
+    return ' Đã migrate database!';
+});
+
+
+Route::get('/create-db', function () {
+    $database = 'prj_interview_db';
+    try {
+        DB::statement("CREATE DATABASE IF NOT EXISTS {$database}");
+        return " Đã tạo database `{$database}`!";
+    } catch (\Exception $e) {
+        return ' Lỗi tạo database: ' . $e->getMessage();
+    }
 });
