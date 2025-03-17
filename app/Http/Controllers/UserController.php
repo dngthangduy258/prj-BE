@@ -65,26 +65,81 @@ class UserController extends Controller
             'avatar' => 'required|image|mimes:jpg,jpeg,png|max:2048'
         ]);
     
+        // Xác thực người dùng
         $user = JWTAuth::parseToken()->authenticate();
     
         if (!$user) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
     
+        // Lấy thông tin file
         $file = $request->file('avatar');
-        $filename = 'avatar_' . $user->id . '.' . $file->getClientOriginalExtension();
+        $filePath = $file->getRealPath(); // Đường dẫn tạm trên server
+        $fileName = 'avatar_' . $user->id . '.' . $file->getClientOriginalExtension();
     
-        // Lưu trực tiếp vào thư mục tạm thời của hệ thống
-        $tmpPath = '/tmp/' . $filename;
-        $file->move('/tmp', $filename); // Di chuyển file vào /tmp
+        // Thông tin Cloudinary
+        $cloudName = 'dilsxgqkq';
+        $apiKey = '253398346126772';
+        $apiSecret = 'YK3V45nVVcmN6gbClSpytizJZlo';
     
-        // Nếu bạn muốn lưu đường dẫn vào DB (tùy bạn có trường avatar hay không)
-        $user->avatar = $tmpPath; // hoặc chỉ lưu tên file thôi nếu thích
+        // Tạo timestamp và signature cho request (theo tài liệu Cloudinary API)
+        $timestamp = time();
+        $params_to_sign = "timestamp=$timestamp";
+        $signature = sha1($params_to_sign . $apiSecret);
+    
+        // API endpoint Cloudinary
+        $url = "https://api.cloudinary.com/v1_1/$cloudName/image/upload";
+    
+        // Tạo data post cho cURL
+        $postData = [
+            'file' => new \CURLFile($filePath),
+            'api_key' => $apiKey,
+            'timestamp' => $timestamp,
+            'signature' => $signature
+        ];
+    
+        // Khởi tạo curl
+        $ch = curl_init();
+    
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    
+        // Thực thi curl
+        $result = curl_exec($ch);
+    
+        // Kiểm tra lỗi
+        if (curl_errno($ch)) {
+            return response()->json([
+                'message' => 'Upload lỗi',
+                'error' => curl_error($ch)
+            ], 500);
+        }
+    
+        curl_close($ch);
+    
+        // Convert kết quả trả về thành mảng
+        $resultData = json_decode($result, true);
+    
+        // Kiểm tra nếu upload không thành công
+        if (!isset($resultData['secure_url'])) {
+            return response()->json([
+                'message' => 'Upload thất bại!',
+                'response' => $resultData
+            ], 500);
+        }
+    
+        // Lấy URL hình ảnh đã upload trên Cloudinary
+        $avatarUrl = $resultData['secure_url'];
+    
+        // Lưu URL vào DB (tuỳ bạn lưu URL hay chỉ tên file)
+        $user->avatar = $avatarUrl;
         $user->save();
     
         return response()->json([
             'message' => 'Upload thành công!',
-            'avatar_tmp_path' => $tmpPath
+            'avatar_url' => $avatarUrl
         ]);
     }
 
