@@ -57,34 +57,34 @@ class UserController extends Controller
         return response()->json(['message' => 'Xóa thành công']);
     }
 
+    
     public function uploadAvatar(Request $request)
     {
         // Validate file gửi lên
         $request->validate([
             'avatar' => 'required|image|mimes:jpg,jpeg,png|max:2048'
         ]);
-
+    
         $user = JWTAuth::parseToken()->authenticate();
-
-
+    
         if (!$user) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
-
-        // Xử lý file avatar
+    
         $file = $request->file('avatar');
         $filename = 'avatar_' . $user->id . '.' . $file->getClientOriginalExtension();
-
-        // Lưu vào storage/app/public/avatars (link storage => public/storage/avatars)
-        $path = $file->storeAs('public/avatars', $filename);
-
-        // Cập nhật đường dẫn vào cột avatar (giả sử DB có trường avatar)
-        $user->avatar = 'storage/avatars/' . $filename;
+    
+        // Lưu trực tiếp vào thư mục tạm thời của hệ thống
+        $tmpPath = '/tmp/' . $filename;
+        $file->move('/tmp', $filename); // Di chuyển file vào /tmp
+    
+        // Nếu bạn muốn lưu đường dẫn vào DB (tùy bạn có trường avatar hay không)
+        $user->avatar = $tmpPath; // hoặc chỉ lưu tên file thôi nếu thích
         $user->save();
-
+    
         return response()->json([
             'message' => 'Upload thành công!',
-            'avatar_url' => asset($user->avatar)
+            'avatar_tmp_path' => $tmpPath
         ]);
     }
 
