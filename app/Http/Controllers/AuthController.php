@@ -14,7 +14,7 @@ class AuthController extends Controller
 {
     private $cloudName = 'dilsxgqkq';
     private $apiKey = '253398346126772';
-    private $apiSecret = 'api_secret';
+    private $apiSecret = 'YK3V45nVVcmN6gbClSpytizJZlo';
 
     private function uploadToCloudinary($file)
     {
