@@ -7,11 +7,50 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 class AuthController extends Controller
 {
+    private $cloudName = 'dilsxgqkq';
+    private $apiKey = '253398346126772';
+    private $apiSecret = 'api_secret';
+
+    private function uploadToCloudinary($file)
+    {
+        $timestamp = time();
+        $uploadPreset = ''; // Nếu không dùng upload preset thì để trống
+
+        $paramsToSign = [
+            'timestamp' => $timestamp,
+            // 'upload_preset' => $uploadPreset // Nếu cần
+        ];
+
+        ksort($paramsToSign);
+
+        $signatureString = http_build_query($paramsToSign) . $this->apiSecret;
+        $signature = sha1($signatureString);
+
+        $response = Http::attach(
+            'file', file_get_contents($file), $file->getClientOriginalName()
+        )->post("https://api.cloudinary.com/v1_1/{$this->cloudName}/image/upload", [
+            'api_key' => $this->apiKey,
+            'timestamp' => $timestamp,
+            'signature' => $signature,
+            // 'upload_preset' => $uploadPreset, // Nếu dùng upload preset
+        ]);
+
+        if ($response->successful()) {
+            return $response->json('secure_url');
+        }
+
+        Log::error('Cloudinary Upload Failed', [
+            'response' => $response->body()
+        ]);
+
+        return null;
+    }
+
     // Đăng nhập
     public function login(Request $request)
     {
@@ -42,24 +81,16 @@ class AuthController extends Controller
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
-        $avatarPath = null;
+        $avatarUrl = null;
 
         if ($request->hasFile('avatar')) {
-            $file = $request->file('avatar');
+            $avatarUrl = $this->uploadToCloudinary($request->file('avatar'));
 
-            // Tạo tên file
-            $fileName = time() . '_' . $file->getClientOriginalName();
-
-            // Lưu file vào thư mục /tmp (Render chỉ cho ghi vào đây)
-            $tmpPath = '/tmp/' . $fileName;
-
-            $file->move('/tmp', $fileName); // Move trực tiếp vào tmp folder
-
-            Log::info("Avatar saved to tmp: " . $tmpPath);
-
-            // Có thể upload tiếp lên cloud như S3 nếu cần (gợi ý)
-
-            $avatarPath = $tmpPath; // hoặc lưu tên file tùy cách dùng
+            if (!$avatarUrl) {
+                return response()->json([
+                    'message' => 'Tải ảnh lên thất bại!'
+                ], 500);
+            }
         }
 
         $user = User::create([
@@ -67,7 +98,7 @@ class AuthController extends Controller
             'email' => $request->email,
             'role' => 'user',
             'password' => bcrypt($request->password),
-            'avatar' => $avatarPath, // Đường dẫn tạm
+            'avatar' => $avatarUrl,
         ]);
 
         $token = JWTAuth::fromUser($user);
@@ -169,23 +200,15 @@ class AuthController extends Controller
 
         // Xử lý avatar
         if ($request->hasFile('avatar')) {
-            $file = $request->file('avatar');
-            $fileName = time() . '_' . $file->getClientOriginalName();
+            $avatarUrl = $this->uploadToCloudinary($request->file('avatar'));
 
-            $tmpPath = '/tmp/' . $fileName;
-
-            // Di chuyển vào /tmp
-            $file->move('/tmp', $fileName);
-
-            Log::info("Avatar updated and saved to tmp: " . $tmpPath);
-
-            // Xóa avatar cũ nếu cần (nếu lưu storage/public thì check disk khác)
-            if ($user->avatar && file_exists($user->avatar)) {
-                unlink($user->avatar);
-                Log::info('Old avatar deleted: ' . $user->avatar);
+            if (!$avatarUrl) {
+                return response()->json([
+                    'message' => 'Tải ảnh lên thất bại!'
+                ], 500);
             }
 
-            $user->avatar = $tmpPath;
+            $user->avatar = $avatarUrl;
         }
 
         $user->save();
@@ -195,7 +218,7 @@ class AuthController extends Controller
             'user' => [
                 'name' => $user->name,
                 'email' => $user->email,
-                'avatar_url' => $user->avatar // trả link hoặc path tạm thời
+                'avatar_url' => $user->avatar
             ]
         ]);
     }
@@ -206,3 +229,4 @@ class AuthController extends Controller
         return response()->json(auth('api')->user());
     }
 }
+
