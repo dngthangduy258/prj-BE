@@ -39,10 +39,10 @@ class GoogleAuthController extends Controller
             Log::info('Token:', ['token' => $token]);
             // ✅ Quan trọng: Sau khi callback thành công thì frontend cần lấy token
             // Ví dụ: Gửi response JSON về hoặc redirect kèm token
-            return redirect()->away('http://localhost:3000/login-success?token=' . $token);
+            return redirect()->away('https://react-fe-blue.vercel.app/login-success?token=' . $token);
 
         } catch (\Exception $e) {
-            return redirect()->away('http://localhost:3000/login-failed');
+            return redirect()->away('https://react-fe-blue.vercel.app/login-failed');
         }
     }
 }
